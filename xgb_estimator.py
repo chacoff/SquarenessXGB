@@ -145,7 +145,7 @@ class SquarenessEstimator:
 
         return _model
 
-    def load_model(self) -> xgb:
+    def load_estimator_model(self) -> xgb:
         """ load the stored JSON model to make testing predictions """
 
         _model = xgb.XGBRegressor()

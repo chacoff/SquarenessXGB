@@ -32,7 +32,7 @@ def main() -> None:
             True
         )
     else:
-        model = estimator.load_model()
+        model = estimator.load_estimator_model()
 
     if onnx:
         initial_types = [('float_input', onnxmltools.convert.common.data_types.FloatTensorType([None, shape]))]

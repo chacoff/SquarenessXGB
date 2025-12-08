@@ -2,7 +2,7 @@ from xgb_estimator import SquarenessEstimator
 
 estimator = SquarenessEstimator('data\\Collecte_dev.csv', ',', 'models\\model_SquarenessQST')
 estimator.load_data()
-model = estimator.load_model()
+model = estimator.load_estimator_model()
 
 input_dev: int = estimator.x.shape[0]
 for i in range(0, input_dev):
