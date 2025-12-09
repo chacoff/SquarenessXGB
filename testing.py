@@ -2,45 +2,68 @@ from xgb_estimator import SquarenessEstimator
 import pandas as pd
 
 
-def predict_by_parameters(model, estimator, nutr_vise=None, dim_prof_mont=None, type_prof_lme=None):
+def round_to_valid(value):
+    valid_values = [-40, -35, -30, -25, -20, -15, -10, 0, 10, 15, 20, 25, 30, 35, 40]
+    return min(valid_values, key=lambda x: abs(x - value))
+
+
+def predict_with_params(model, estimator, nutr_vise=None, dim_prof_mont=None, type_prof_lme=None, **other_params):
     """
-    Get predictions for records matching the specified parameters.
-    Pass None to skip filtering on that parameter.
+    Make predictions by finding the encoded value from training data.
     """
 
-    data_source = estimator.data if hasattr(estimator, 'data') else estimator.x
+    # Find rows in original data that match TYPE_PROF_LME
+    matching_rows = estimator._data[estimator._data['TYPE_PROF_LME'].isin(
+        estimator._data[estimator._data.index.isin(estimator.x.index)]['TYPE_PROF_LME'].unique()
+    )]
+    
+    # Get the encoded value for TYPE_PROF_LME
+    original_data = pd.read_csv(estimator._location, sep=estimator._separator)
+    matching_original = original_data[original_data['TYPE_PROF_LME'] == type_prof_lme]
+    
+    if len(matching_original) == 0:
+        raise ValueError(f"TYPE_PROF_LME value '{type_prof_lme}' not found in training data")
+    
+    # Get the index and find encoded value
+    idx = matching_original.index[0]
+    if idx in estimator.x.index:
+        encoded_type = estimator.x.loc[idx, 'TYPE_PROF_LME']
+    else:
+        # Re-encode
+        from sklearn.preprocessing import LabelEncoder
+        le = LabelEncoder()
+        le.fit(original_data['TYPE_PROF_LME'].astype(str))
+        encoded_type = le.transform([str(type_prof_lme)])[0]
+    
+    # Create input row
+    input_data = pd.DataFrame([{
+        'MODELE_PILOTAGE': estimator.x['MODELE_PILOTAGE'].iloc[0],  # Need to handle this too
+        'DIM_PROF_MONT': dim_prof_mont,
+        'TYPE_PROF_LME': encoded_type,
+        'PCRT_PROF_LME': estimator.x['PCRT_PROF_LME'].iloc[0],
+        'NUTR_VISE': nutr_vise,
+        'NUTR_REAL': estimator.x['NUTR_REAL'].iloc[0],
+        'QST_HISTAR_VISE': estimator.x['QST_HISTAR_VISE'].iloc[0],
+        'DBT_AILE_INT_SUP': estimator.x['DBT_AILE_INT_SUP'].iloc[0],
+        'DBT_AME_SUP': estimator.x['DBT_AME_SUP'].iloc[0],
+        'DBT_AILE_INT_SUP_AVANT_EQ': estimator.x['DBT_AILE_INT_SUP_AVANT_EQ'].iloc[0],
+        'DBT_AME_SUP_AVANT_EQ': estimator.x['DBT_AME_SUP_AVANT_EQ'].iloc[0],
+        'DBT_AILE_INT_SUP_REAL': estimator.x['DBT_AILE_INT_SUP_REAL'].iloc[0],
+        'DBT_AME_SUP_REAL': estimator.x['DBT_AME_SUP_REAL'].iloc[0],
+    }])
+    
+    # Override with any additional params
+    for key, value in other_params.items():
+        if key in input_data.columns:
+            input_data[key] = value
+    
+    predictions = model.predict(input_data)
+    
+    print(f'MOD_DBT_AILE_SUP = {round_to_valid(predictions[0][0])}')
+    print(f'MOD_DBT_AME_SUP = {round_to_valid(predictions[0][1])}')
+    
+    return predictions
 
-    mask = pd.Series([True] * len(data_source), index=data_source.index)
-    
-    # Apply filters if parameters are provided
-    if nutr_vise is not None:
-        mask = mask & (estimator.x['NUTR_VISE'] == nutr_vise)
-    if dim_prof_mont is not None:
-        mask = mask & (estimator.x['DIM_PROF_MONT'] == dim_prof_mont)
-    if type_prof_lme is not None:
-        mask = mask & (estimator.x['TYPE_PROF_LME'] == type_prof_lme)
-    
-    filtered_data = estimator.x[mask]
-    
-    print(f"Found {len(filtered_data)} matching records")
-    
-    results = []
-    for i in filtered_data.index:
-        single_input = estimator.x.iloc[[i]]
-        predictions = model.predict(single_input)
-        
-        result = {
-            'index': i,
-            'MOD_DBT_AILE_SUP': round(float(predictions[0][0]), 1),
-            'MOD_DBT_AME_SUP': round(float(predictions[0][1]), 1)
-        }
-        results.append(result)
-        
-        print(f'\nRecord index: {i}')
-        print(f'MOD_DBT_AILE_SUP = {result["MOD_DBT_AILE_SUP"]}')
-        print(f'MOD_DBT_AME_SUP = {result["MOD_DBT_AME_SUP"]}')
-    
-    return results
 
 
 def main():
@@ -58,9 +81,12 @@ def main():
         print("Available columns in estimator.data:")
         print(estimator.data.columns.tolist())
 
-    results = predict_by_parameters(
+    results = predict_with_params(
         model=model,
-        estimator=estimator
+        estimator=estimator,
+        nutr_vise=590.0,
+        dim_prof_mont=33153,
+        type_prof_lme='WF'
     )
 
 
