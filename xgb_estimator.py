@@ -69,6 +69,7 @@ class SquarenessEstimator:
 
     def load_data(self) -> None:
         """ load data in a panda dataframe and follows to drop NA values and encoder categorical values"""
+        rename_columns: bool = False
         self._data = pd.read_csv(self._location, sep=self._separator)
         self._drop_nas()
         self._encode_labels()
@@ -76,12 +77,13 @@ class SquarenessEstimator:
         _x = self._data[self.features].copy()
         _y = self._data[self.targets].copy()
 
-        # @TODO: work around to export to onnx. Pay atttention with name = f"{old_name}_{i}"
-        new_column_names = {old_name: f"f{i}" for i, old_name in enumerate(_x.columns)}
-        _x.rename(columns=new_column_names, inplace=True)
+        if rename_columns:
+            # @TODO: work around to export to onnx. Pay atttention with name = f"{old_name}_{i}"
+            new_column_names = {old_name: f"f{i}" for i, old_name in enumerate(_x.columns)}
+            _x.rename(columns=new_column_names, inplace=True)
 
-        new_column_names = {old_name: f"f{i}" for i, old_name in enumerate(_y.columns)}
-        _y.rename(columns=new_column_names, inplace=True)
+            new_column_names = {old_name: f"f{i}" for i, old_name in enumerate(_y.columns)}
+            _y.rename(columns=new_column_names, inplace=True)
 
         self.x = _x
         self.y = _y
